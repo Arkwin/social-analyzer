@@ -1,4 +1,5 @@
-var helper = require('./helper.js')
+var helper = require('./helper.js');
+var extraction = require('./extraction.js');
 var async = require("async");
 var sanitizeHtml = require("sanitize-html");
 var {
@@ -24,7 +25,9 @@ async function find_username_normal(req) {
   }
 
   all_results = all_results.filter(item => item)
-  return all_results.sort((first, second) => {return helper.compare_objects(first, second, 'rate')})
+  return all_results.sort((first, second) => {
+    return helper.compare_objects(first, second, 'rate')
+  })
 }
 
 async function get_failed(req, failed) {
@@ -130,18 +133,40 @@ async function find_username_site(uuid, username, options, site) {
         if (temp_profile.good == "true") {
           var temp_value = ((temp_profile["found"] / detections_count) * 100).toFixed(2)
           temp_profile.rate = "%" + temp_value;
-          if (temp_value >= 100.00){
+          if (temp_value >= 100.00) {
             temp_profile.status = "good"
-          }
-          else if (temp_value >= 50.00 && temp_value < 100.00){
+          } else if (temp_value >= 50.00 && temp_value < 100.00) {
             temp_profile.status = "maybe"
-          }
-          else{
+          } else {
             temp_profile.status = "bad"
           }
         }
+
         temp_profile.link = site.url.replace("{username}", username);
         temp_profile.type = site.type
+
+        if (temp_profile.status == "good") {
+          if (options.includes("ExtractPatterns")) {
+            var temp_extracted_list = []
+            temp_extracted_list = await extraction.extract_patterns(site, source)
+            if (temp_extracted_list.length > 0) {
+              temp_profile.extracted = temp_extracted_list
+            }
+          }
+          if (options.includes("ExtractMetadata")) {
+            var temp_metadata_list = []
+            temp_metadata_list = await extraction.extract_metadata(site, source)
+            if (temp_metadata_list.length > 0) {
+              temp_profile.metadata = temp_metadata_list
+            }
+          }
+        }
+
+        ["title", "language", "text", "type", "metadata", "extracted"].forEach((item) => {
+          if (temp_profile[item] == "") {
+            temp_profile[item] = "unavailable"
+          }
+        });
 
         if (options.includes("FindUserProfilesFast") && !options.includes("GetUserProfilesFast")) {
           temp_profile.method = "find"

@@ -33,6 +33,15 @@ var argv = require('yargs')
   .default("method", "all")
   .describe('grid', 'grid option, not for CLI')
   .default("grid", "")
+  .describe('extract', 'Extract profiles, urls & patterns if possible')
+  .default("extract", false)
+  .boolean('extract')
+  .describe('metadata', 'Extract metadata if possible (pypi QeeqBox OSINT)')
+  .default("metadata", false)
+  .boolean('metadata')
+  .describe('trim', 'Trim long strings')
+  .default("trim", false)
+  .boolean('trim')
   .help('help')
   .argv;
 
@@ -417,12 +426,17 @@ async function check_user_cli(argv) {
   var temp_options = "GetUserProfilesFast,FindUserProfilesFast"
   if (argv.method != "") {
     if (argv.method == "find") {
-      temp_options = "FindUserProfilesFast"
+      temp_options = ",FindUserProfilesFast,"
     } else if (argv.method == "get") {
-      temp_options = "GetUserProfilesFast"
+      temp_options = ",GetUserProfilesFast,"
     }
   }
-
+  if (argv.extract){
+    temp_options += ",ExtractPatterns,"
+  }
+  if (argv.metadata){
+    temp_options += ",ExtractMetadata,"
+  }
   var req = {
     'body': {
       'uuid': random_string,
@@ -466,7 +480,7 @@ async function check_user_cli(argv) {
           item = clean_up_item(item,argv.options)
           temp_detected.detected.push(item)
         } else {
-          item = delete_keys(item,['found','rate','status','method','good'])
+          item = delete_keys(item,['found','rate','status','method','good','extracted','metadata'])
           item = clean_up_item(item,argv.options)
           temp_detected.unknown.push(item)
         }
@@ -477,11 +491,11 @@ async function check_user_cli(argv) {
           temp_detected.detected.push(item)
         }
       } else if (item.method == "get") {
-        item = delete_keys(item,['found','rate','status','method','good'])
+        item = delete_keys(item,['found','rate','status','method','good','extracted','metadata'])
         item = clean_up_item(item,argv.options)
         temp_detected.unknown.push(item)
       } else if (item.method == "failed") {
-        item = delete_keys(item,['found','rate','status','method','good','text','language','title','type'])
+        item = delete_keys(item,['found','rate','status','method','good','text','language','title','type','extracted','metadata'])
         item = clean_up_item(item,argv.options)
         temp_detected.failed.push(item)
       }
@@ -502,15 +516,15 @@ async function check_user_cli(argv) {
     if (argv.output == "pretty" || argv.output == "") {
       if ('detected' in temp_detected) {
         helper.log_to_file_queue(req.body.uuid, "[Detected] " + temp_detected.detected.length + " Profile[s]");
-        helper.log_to_file_queue(req.body.uuid, temp_detected.detected, true);
+        helper.log_to_file_queue(req.body.uuid, temp_detected.detected, true, argv);
       }
       if ('unknown' in temp_detected) {
         helper.log_to_file_queue(req.body.uuid, "[Unknown] " + temp_detected.unknown.length + " Profile[s]");
-        helper.log_to_file_queue(req.body.uuid, temp_detected.unknown, true);
+        helper.log_to_file_queue(req.body.uuid, temp_detected.unknown, true, argv);
       }
       if ('failed' in temp_detected) {
         helper.log_to_file_queue(req.body.uuid, "[failed] " + temp_detected.failed.length + " Profile[s]");
-        helper.log_to_file_queue(req.body.uuid, temp_detected.failed, true);
+        helper.log_to_file_queue(req.body.uuid, temp_detected.failed, true, argv);
       }
     }
 
